@@ -32,7 +32,7 @@ func ParseTarget(s string) (*url.URL, error) {
 	return target, nil
 }
 
-func Check(t *url.URL) (latency float64, err error) {
+func Check(t *url.URL) (stime time.Time, latency time.Duration, err error) {
 	password, _ := t.User.Password()
 	d := &smb2.Dialer{
 		Initiator: &smb2.NTLMInitiator{
@@ -41,20 +41,24 @@ func Check(t *url.URL) (latency float64, err error) {
 		},
 	}
 
-	stime := time.Now()
+	stime = time.Now()
 
 	conn, err := net.Dial("tcp", t.Host)
 	if err != nil {
-		return float64(time.Now().Sub(stime).Microseconds()) / 1000, err
+		return stime, time.Now().Sub(stime), err
 	}
 
 	s, err := d.Dial(conn)
 	if err != nil {
-		return float64(time.Now().Sub(stime).Microseconds()) / 1000, err
+		return stime, time.Now().Sub(stime), err
 	}
 	s.Logoff()
 
-	return float64(time.Now().Sub(stime).Microseconds()) / 1000, nil
+	return stime, time.Now().Sub(stime), nil
+}
+
+func PrintLog(stime time.Time, status string, latency time.Duration, message string) {
+	fmt.Printf("%s\t%s\t%.3f\t%s\t%s", stime.Format(time.RFC3339), status, float64(latency.Microseconds())/1000, os.Args[1], message)
 }
 
 func main() {
@@ -65,18 +69,13 @@ func main() {
 
 	target, err := ParseTarget(os.Args[1])
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "::status::UNKNOWN")
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		PrintLog(time.Now(), "UNKNOWN", 0, "invalid URL format: "+err.Error())
+		return
 	}
 
-	if latency, err := Check(target); err != nil {
-		fmt.Fprintln(os.Stderr, "::status::FAILURE")
-		fmt.Fprintf(os.Stderr, "::latency::%.3f\n", latency)
-		fmt.Fprintln(os.Stderr, err)
+	if stime, latency, err := Check(target); err != nil {
+		PrintLog(stime, "FAILURE", latency, err.Error())
 	} else {
-		fmt.Fprintln(os.Stderr, "::status::HEALTHY")
-		fmt.Fprintf(os.Stderr, "::latency::%.3f\n", latency)
-		fmt.Fprintln(os.Stderr, "OK")
+		PrintLog(stime, "HEALTHY", latency, "OK")
 	}
 }
