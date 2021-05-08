@@ -9,27 +9,23 @@ import (
 	"time"
 
 	"github.com/hirochachacha/go-smb2"
+	"github.com/macrat/ayd/lib-ayd"
 )
 
-func ParseTarget(s string) (*url.URL, error) {
-	target, err := url.Parse(s)
-	if err != nil {
-		return nil, errors.New("invalid target URI")
+func NormalizeTarget(u *url.URL) error {
+	if u.Hostname() == "" {
+		return errors.New("invalid target URI: hostname is required")
 	}
 
-	if target.Hostname() == "" {
-		return nil, errors.New("invalid target URI: hostname is required")
+	if pass, _ := u.User.Password(); pass == "" {
+		u.User = url.User("guest")
 	}
 
-	if pass, _ := target.User.Password(); pass == "" {
-		target.User = url.User("guest")
+	if u.Port() == "" {
+		u.Host = u.Hostname() + ":445"
 	}
 
-	if target.Port() == "" {
-		target.Host = fmt.Sprintf("%s:445", target.Hostname())
-	}
-
-	return target, nil
+	return nil
 }
 
 func Check(t *url.URL) (stime time.Time, latency time.Duration, err error) {
@@ -57,25 +53,24 @@ func Check(t *url.URL) (stime time.Time, latency time.Duration, err error) {
 	return stime, time.Now().Sub(stime), nil
 }
 
-func PrintLog(stime time.Time, status string, latency time.Duration, message string) {
-	fmt.Printf("%s\t%s\t%.3f\t%s\t%s", stime.Format(time.RFC3339), status, float64(latency.Microseconds())/1000, os.Args[1], message)
-}
-
 func main() {
-	if len(os.Args) != 2 {
+	args, err := ayd.ParseProbePluginArgs()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "$ ayd-smb-alert TARGET_URI")
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 
-	target, err := ParseTarget(os.Args[1])
-	if err != nil {
-		PrintLog(time.Now(), "UNKNOWN", 0, "invalid URL format: "+err.Error())
+	logger := ayd.NewLogger(args.TargetURL)
+
+	if err = NormalizeTarget(args.TargetURL); err != nil {
+		logger.Failure("invalid URL format: " + err.Error())
 		return
 	}
 
-	if stime, latency, err := Check(target); err != nil {
-		PrintLog(stime, "FAILURE", latency, err.Error())
+	if stime, latency, err := Check(args.TargetURL); err != nil {
+		logger.WithTime(stime, latency).Failure(err.Error())
 	} else {
-		PrintLog(stime, "HEALTHY", latency, "OK")
+		logger.WithTime(stime, latency).Healthy("OK")
 	}
 }

@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/macrat/ayd-smb-probe"
@@ -20,7 +21,9 @@ func TestParseTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.Input, func(t *testing.T) {
-			u, err := main.ParseTarget(tt.Input)
+			u, _ := url.Parse(tt.Input)
+
+			err := main.NormalizeTarget(u)
 			if err != nil {
 				if err.Error() != tt.Error {
 					t.Fatalf("unexpected error: %s", err)
