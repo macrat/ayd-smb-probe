@@ -11,27 +11,21 @@ func TestParseTarget(t *testing.T) {
 	tests := []struct {
 		Input  string
 		Output string
-		Error  string
 	}{
-		{"smb://hello:world@example.com", "smb://hello:world@example.com:445", ""},
-		{"smb://foo:bar@127.0.0.1:1234", "smb://foo:bar@127.0.0.1:1234", ""},
-		{"smb://example.com", "smb://guest@example.com:445", ""},
-		{"smb:", "", "invalid target URI: hostname is required"},
+		{"smb://hello:world@example.com", "smb://hello:world@example.com"},
+		{"smb://foo:bar@127.0.0.1:1234", "smb://foo:bar@127.0.0.1:1234"},
+		{"smb://example.com", "smb://guest@example.com"},
+		{"smb://example.com/path/to#abc#def=ghi", "smb://guest@example.com"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.Input, func(t *testing.T) {
-			u, _ := url.Parse(tt.Input)
-
-			err := main.NormalizeTarget(u)
+			u, err := url.Parse(tt.Input)
 			if err != nil {
-				if err.Error() != tt.Error {
-					t.Fatalf("unexpected error: %s", err)
-				}
-				return
-			} else if tt.Error != "" {
-				t.Fatal("expected error but got nil")
+				t.Fatalf("failed to parse input url: %s", err)
 			}
+
+			u = main.NormalizeTarget(u)
 
 			if u.String() != tt.Output {
 				t.Errorf("unexpected output: %s", u)

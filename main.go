@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -12,20 +11,18 @@ import (
 	"github.com/macrat/ayd/lib-ayd"
 )
 
-func NormalizeTarget(u *url.URL) error {
-	if u.Hostname() == "" {
-		return errors.New("invalid target URI: hostname is required")
+func NormalizeTarget(u *url.URL) *url.URL {
+	u = &url.URL{
+		Scheme: "smb",
+		Host:   u.Host,
+		User:   u.User,
 	}
 
 	if pass, _ := u.User.Password(); pass == "" {
 		u.User = url.User("guest")
 	}
 
-	if u.Port() == "" {
-		u.Host = u.Hostname() + ":445"
-	}
-
-	return nil
+	return u
 }
 
 func Check(t *url.URL) (stime time.Time, latency time.Duration, err error) {
@@ -39,7 +36,12 @@ func Check(t *url.URL) (stime time.Time, latency time.Duration, err error) {
 
 	stime = time.Now()
 
-	conn, err := net.Dial("tcp", t.Host)
+	host := t.Host
+	if t.Port() == "" {
+		host += ":445"
+	}
+
+	conn, err := net.Dial("tcp", host)
 	if err != nil {
 		return stime, time.Now().Sub(stime), err
 	}
@@ -61,11 +63,12 @@ func main() {
 		os.Exit(2)
 	}
 
+	args.TargetURL = NormalizeTarget(args.TargetURL)
 	logger := ayd.NewLogger(args.TargetURL)
 
-	if err = NormalizeTarget(args.TargetURL); err != nil {
-		logger.Failure("invalid URL format: " + err.Error())
-		return
+	if args.TargetURL.Hostname() == "" {
+		logger.Failure("invalid target URI: hostname is required")
+		os.Exit(2)
 	}
 
 	if stime, latency, err := Check(args.TargetURL); err != nil {
