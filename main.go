@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"net/url"
@@ -9,6 +10,11 @@ import (
 
 	"github.com/hirochachacha/go-smb2"
 	"github.com/macrat/ayd/lib-ayd"
+)
+
+var (
+	version = "HEAD"
+	commit  = "UNKNOWN"
 )
 
 func NormalizeTarget(u *url.URL) *url.URL {
@@ -56,9 +62,22 @@ func Check(t *url.URL) (stime time.Time, latency time.Duration, err error) {
 }
 
 func main() {
+	flag.Usage = func() {
+		fmt.Println("SMB protocol plugin for Ayd?")
+		fmt.Println()
+		fmt.Println("usage: ayd-smb-probe TARGET_URI")
+	}
+	showVersion := flag.Bool("v", false, "show version")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("ayd-smb-probe %s (%s)\n", version, commit)
+		return
+	}
+
 	args, err := ayd.ParseProbePluginArgs()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "$ ayd-smb-alert TARGET_URI")
+		fmt.Fprintln(os.Stderr, "$ ayd-smb-probe TARGET_URI")
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
