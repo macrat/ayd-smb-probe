@@ -65,7 +65,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Println("SMB protocol plugin for Ayd?")
 		fmt.Println()
-		fmt.Println("usage: ayd-smb-probe TARGET_URI")
+		fmt.Println("usage: ayd-smb-probe TARGET_URL")
 	}
 	showVersion := flag.Bool("v", false, "show version")
 	flag.Parse()
@@ -77,7 +77,7 @@ func main() {
 
 	args, err := ayd.ParseProbePluginArgs()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "$ ayd-smb-probe TARGET_URI")
+		fmt.Fprintln(os.Stderr, "$ ayd-smb-probe TARGET_URL")
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
