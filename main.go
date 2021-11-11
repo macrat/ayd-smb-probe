@@ -86,8 +86,8 @@ func main() {
 	logger := ayd.NewLogger(args.TargetURL)
 
 	if args.TargetURL.Hostname() == "" {
-		logger.Failure("invalid target URI: hostname is required")
-		os.Exit(2)
+		logger.Failure("invalid URL: hostname is required")
+		return
 	}
 
 	if stime, latency, err := Check(args.TargetURL); err != nil {
