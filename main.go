@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
 	"net/url"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/hirochachacha/go-smb2"
@@ -18,10 +21,15 @@ var (
 )
 
 func NormalizeTarget(u *url.URL) *url.URL {
+	if u.Path == "" {
+		u.Path = "/"
+	}
+
 	u = &url.URL{
 		Scheme: "smb",
 		Host:   u.Host,
 		User:   u.User,
+		Path:   path.Clean(u.Path),
 	}
 
 	if pass, _ := u.User.Password(); pass == "" {
@@ -31,7 +39,18 @@ func NormalizeTarget(u *url.URL) *url.URL {
 	return u
 }
 
-func Check(t *url.URL) (stime time.Time, latency time.Duration, err error) {
+func SplitPath(urlPath string) (share, filePath string) {
+	ss := strings.SplitN(urlPath[1:], "/", 2)
+	if len(ss) == 1 {
+		return ss[0], "."
+	}
+	return ss[0], path.Clean(ss[1])
+}
+
+func Check(t *url.URL) (msg string, stime time.Time, latency time.Duration, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
 	password, _ := t.User.Password()
 	d := &smb2.Dialer{
 		Initiator: &smb2.NTLMInitiator{
@@ -47,18 +66,51 @@ func Check(t *url.URL) (stime time.Time, latency time.Duration, err error) {
 		host += ":445"
 	}
 
-	conn, err := net.Dial("tcp", host)
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", host)
 	if err != nil {
-		return stime, time.Now().Sub(stime), err
+		return "", stime, time.Since(stime), err
 	}
 
-	s, err := d.Dial(conn)
+	sess, err := d.DialContext(ctx, conn)
 	if err != nil {
-		return stime, time.Now().Sub(stime), err
+		return "", stime, time.Since(stime), err
 	}
-	s.Logoff()
+	defer sess.Logoff()
 
-	return stime, time.Now().Sub(stime), nil
+	sess = sess.WithContext(ctx)
+
+	shareName, path := SplitPath(t.Path)
+	if shareName == "" {
+		shares, err := sess.ListSharenames()
+		if err != nil {
+			return "", stime, time.Since(stime), err
+		}
+		return fmt.Sprintf("type=server shares=%d", len(shares)), stime, time.Since(stime), nil
+	}
+
+	share, err := sess.Mount(shareName)
+	if err != nil {
+		return "", stime, time.Since(stime), err
+	}
+	defer share.Umount()
+
+	share = share.WithContext(ctx)
+
+	stat, err := share.Stat(path)
+	if err != nil {
+		return "", stime, time.Since(stime), err
+	}
+
+	if stat.IsDir() {
+		files, err := share.ReadDir(path)
+		if err != nil {
+			return "", stime, time.Since(stime), err
+		}
+		msg = fmt.Sprintf("type=directory files=%d", len(files))
+	} else {
+		msg = fmt.Sprintf("type=file size=%d", stat.Size())
+	}
+	return msg, stime, time.Since(stime), nil
 }
 
 func main() {
@@ -90,9 +142,9 @@ func main() {
 		return
 	}
 
-	if stime, latency, err := Check(args.TargetURL); err != nil {
+	if msg, stime, latency, err := Check(args.TargetURL); err != nil {
 		logger.WithTime(stime, latency).Failure(err.Error())
 	} else {
-		logger.WithTime(stime, latency).Healthy("OK")
+		logger.WithTime(stime, latency).Healthy(msg)
 	}
 }

@@ -12,10 +12,12 @@ func TestParseTarget(t *testing.T) {
 		Input  string
 		Output string
 	}{
-		{"smb://hello:world@example.com", "smb://hello:world@example.com"},
-		{"smb://foo:bar@127.0.0.1:1234", "smb://foo:bar@127.0.0.1:1234"},
-		{"smb://example.com", "smb://guest@example.com"},
-		{"smb://example.com/path/to#abc#def=ghi", "smb://guest@example.com"},
+		{"smb://hello:world@example.com", "smb://hello:world@example.com/"},
+		{"smb://foo:bar@127.0.0.1:1234", "smb://foo:bar@127.0.0.1:1234/"},
+		{"smb://example.com", "smb://guest@example.com/"},
+		{"smb://example.com/path/to#abc#def=ghi", "smb://guest@example.com/path/to"},
+		{"smb://example.com/path", "smb://guest@example.com/path"},
+		{"smb://example.com/a/../b/", "smb://guest@example.com/b"},
 	}
 
 	for _, tt := range tests {
@@ -28,7 +30,7 @@ func TestParseTarget(t *testing.T) {
 			u = main.NormalizeTarget(u)
 
 			if u.String() != tt.Output {
-				t.Errorf("unexpected output: %s", u)
+				t.Errorf("expected %s but got %s", tt.Output, u)
 			}
 		})
 	}

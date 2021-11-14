@@ -14,9 +14,11 @@ SMB protocol plugin for [Ayd?](https://github.com/macrat/ayd) status check servi
 ## Usage
 
 ``` shell
-$ ayd smb://username:password@hostname.example.com
+$ ayd smb://username:password@hostname.example.com/share/path/to/file
 ```
 
-This example is check if can login to `\\hostname.example.com` with `username` and `password`.
+This example is check if can access to `\\hostname.example.com\share\path\to\file` with `username` and `password`.
 
-If omit username, it use `guest` as username.
+The path to file or directory is optional.
+
+The username and password is also optional. It uses `guest` as username if omitted.
