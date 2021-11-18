@@ -1,6 +1,8 @@
 ayd-smb-probe
 =============
 
+[![CI](https://github.com/macrat/ayd-smb-probe/actions/workflows/ci.yml/badge.svg)](https://github.com/macrat/ayd-smb-probe/actions/workflows/ci.yml)
+
 SMB protocol plugin for [Ayd?](https://github.com/macrat/ayd) status check service.
 
 
