@@ -20,12 +20,12 @@ var (
 	commit  = "UNKNOWN"
 )
 
-func NormalizeTarget(u *url.URL) *url.URL {
+func NormalizeTarget(u *ayd.URL) *ayd.URL {
 	if u.Path == "" {
 		u.Path = "/"
 	}
 
-	u = &url.URL{
+	u = &ayd.URL{
 		Scheme: "smb",
 		Host:   u.Host,
 		User:   u.User,
@@ -47,7 +47,7 @@ func SplitPath(urlPath string) (share, filePath string) {
 	return ss[0], path.Clean(ss[1])
 }
 
-func Check(t *url.URL) (msg string, stime time.Time, latency time.Duration, err error) {
+func Check(t *ayd.URL) (msg string, extra map[string]interface{}, stime time.Time, latency time.Duration, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
@@ -62,18 +62,18 @@ func Check(t *url.URL) (msg string, stime time.Time, latency time.Duration, err 
 	stime = time.Now()
 
 	host := t.Host
-	if t.Port() == "" {
+	if t.ToURL().Port() == "" {
 		host += ":445"
 	}
 
 	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", host)
 	if err != nil {
-		return "", stime, time.Since(stime), err
+		return "", nil, stime, time.Since(stime), err
 	}
 
 	sess, err := d.DialContext(ctx, conn)
 	if err != nil {
-		return "", stime, time.Since(stime), err
+		return "", nil, stime, time.Since(stime), err
 	}
 	defer sess.Logoff()
 
@@ -83,14 +83,18 @@ func Check(t *url.URL) (msg string, stime time.Time, latency time.Duration, err 
 	if shareName == "" {
 		shares, err := sess.ListSharenames()
 		if err != nil {
-			return "", stime, time.Since(stime), err
+			return "", nil, stime, time.Since(stime), err
 		}
-		return fmt.Sprintf("type=server shares=%d", len(shares)), stime, time.Since(stime), nil
+		extra = map[string]interface{}{
+			"shares_count": len(shares),
+			"type":         "server",
+		}
+		return "server exists", extra, stime, time.Since(stime), nil
 	}
 
 	share, err := sess.Mount(shareName)
 	if err != nil {
-		return "", stime, time.Since(stime), err
+		return "", nil, stime, time.Since(stime), err
 	}
 	defer share.Umount()
 
@@ -98,19 +102,29 @@ func Check(t *url.URL) (msg string, stime time.Time, latency time.Duration, err 
 
 	stat, err := share.Stat(path)
 	if err != nil {
-		return "", stime, time.Since(stime), err
+		return "", nil, stime, time.Since(stime), err
 	}
 
 	if stat.IsDir() {
 		files, err := share.ReadDir(path)
 		if err != nil {
-			return "", stime, time.Since(stime), err
+			return "", nil, stime, time.Since(stime), err
 		}
-		msg = fmt.Sprintf("type=directory files=%d", len(files))
+		msg = "directory exists"
+		extra = map[string]interface{}{
+			"file_count": len(files),
+			"mtime":      stat.ModTime().Format(time.RFC3339),
+			"type":       "directory",
+		}
 	} else {
-		msg = fmt.Sprintf("type=file size=%d", stat.Size())
+		msg = "file exists"
+		extra = map[string]interface{}{
+			"file_size": stat.Size(),
+			"mtime":     stat.ModTime().Format(time.RFC3339),
+			"type":      "file",
+		}
 	}
-	return msg, stime, time.Since(stime), nil
+	return msg, extra, stime, time.Since(stime), nil
 }
 
 func main() {
@@ -137,14 +151,14 @@ func main() {
 	args.TargetURL = NormalizeTarget(args.TargetURL)
 	logger := ayd.NewLogger(args.TargetURL)
 
-	if args.TargetURL.Hostname() == "" {
-		logger.Failure("invalid URL: hostname is required")
+	if args.TargetURL.ToURL().Hostname() == "" {
+		logger.Failure("invalid URL: hostname is required", nil)
 		return
 	}
 
-	if msg, stime, latency, err := Check(args.TargetURL); err != nil {
-		logger.WithTime(stime, latency).Failure(err.Error())
+	if msg, extra, stime, latency, err := Check(args.TargetURL); err != nil {
+		logger.WithTime(stime, latency).Failure(err.Error(), extra)
 	} else {
-		logger.WithTime(stime, latency).Healthy(msg)
+		logger.WithTime(stime, latency).Healthy(msg, extra)
 	}
 }
