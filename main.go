@@ -127,9 +127,13 @@ func Check(t *ayd.URL) (msg string, extra map[string]interface{}, stime time.Tim
 	return msg, extra, stime, time.Since(stime), nil
 }
 
+func Usage() {
+	fmt.Fprintln(os.Stderr, "$ ayd-smb-probe TARGET_URL")
+}
+
 func main() {
 	flag.Usage = func() {
-		fmt.Println("SMB protocol plugin for Ayd?")
+		fmt.Println("SMB protocol plugin for Ayd status monitoring tool")
 		fmt.Println()
 		fmt.Println("usage: ayd-smb-probe TARGET_URL")
 	}
@@ -141,22 +145,27 @@ func main() {
 		return
 	}
 
-	args, err := ayd.ParseProbePluginArgs()
+	if len(os.Args) != 2 {
+		Usage()
+		os.Exit(2)
+	}
+
+	target, err := ayd.ParseURL(os.Args[1])
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "$ ayd-smb-probe TARGET_URL")
+		Usage()
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 
-	args.TargetURL = NormalizeTarget(args.TargetURL)
-	logger := ayd.NewLogger(args.TargetURL)
+	target = NormalizeTarget(target)
+	logger := ayd.NewLogger(target)
 
-	if args.TargetURL.ToURL().Hostname() == "" {
+	if target.ToURL().Hostname() == "" {
 		logger.Failure("invalid URL: hostname is required", nil)
 		return
 	}
 
-	if msg, extra, stime, latency, err := Check(args.TargetURL); err != nil {
+	if msg, extra, stime, latency, err := Check(target); err != nil {
 		logger.WithTime(stime, latency).Failure(err.Error(), extra)
 	} else {
 		logger.WithTime(stime, latency).Healthy(msg, extra)
