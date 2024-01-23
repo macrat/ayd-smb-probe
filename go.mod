@@ -1,6 +1,6 @@
 module github.com/macrat/ayd-smb-probe
 
-go 1.18
+go 1.21
 
 require (
 	github.com/hirochachacha/go-smb2 v1.1.0
