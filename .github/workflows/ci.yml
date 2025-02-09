@@ -20,7 +20,7 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./cov
+          files: ./cov
 
   test-linux:
     name: Test on Linux
@@ -37,7 +37,7 @@ jobs:
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./cov
+          files: ./cov
 
   analyze:
     name: CodeQL
