@@ -8,7 +8,6 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
     flags:
       - -trimpath
     ldflags:
@@ -22,6 +21,7 @@ builds:
       - CGO_ENABLED=0
     goos:
       - windows
+      - darwin
     flags:
       - -trimpath
     ldflags:
