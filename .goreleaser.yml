@@ -30,7 +30,7 @@ builds:
       - '-X main.commit={{ .ShortCommit }}'
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: >-
       {{- .ProjectName -}}
       _
@@ -47,7 +47,7 @@ archives:
       {{- end -}}
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     files: [none*]
 
 changelog:
